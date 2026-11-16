@@ -1,0 +1,54 @@
+
+name: Build SUPERA.E APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android tools
+        run: |
+          sdkmanager "platforms;android-35" \
+            "build-tools;35.0.0" \
+            "ndk;27.2.12479018" \
+            "cmake;3.22.1"
+
+      - name: Extract project
+        run: |
+          ZIP=$(find . -maxdepth 1 -name '*.zip' | head -n 1)
+          test -n "$ZIP"
+          mkdir -p "$RUNNER_TEMP/project"
+          unzip -q "$ZIP" -d "$RUNNER_TEMP/project"
+
+      - name: Prepare native engine
+        working-directory: ${{ runner.temp }}/project/SUPERA_E_Native_Android
+        run: |
+          chmod +x scripts/setup-native-engine.sh
+          bash scripts/setup-native-engine.sh
+
+      - name: Build APK
+        working-directory: ${{ runner.temp }}/project/SUPERA_E_Native_Android
+        run: bash scripts/build-apk.sh
+
+      - name: Upload APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SUPERA-E-debug-APK
+          path: ${{ runner.temp }}/project/SUPERA_E_Native_Android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
